@@ -37,9 +37,12 @@ const clients = new Set<WSContext>();
 
 // Info endpoint - shows base URL and connection status
 app.get('/info', (c) => {
-  const protocol = c.req.header('x-forwarded-proto') || 'http';
-  const host = c.req.header('host') || 'localhost:3000';
-  const baseUrl = `${protocol}://${host}`;
+  // Use BASE_URL env var if set, otherwise auto-detect from request
+  const baseUrl = process.env.BASE_URL || (() => {
+    const protocol = c.req.header('x-forwarded-proto') || 'http';
+    const host = c.req.header('host') || 'localhost:3000';
+    return `${protocol}://${host}`;
+  })();
   
   return c.json({
     name: 'Hono Pusher Clone',
@@ -59,6 +62,7 @@ app.get('/info', (c) => {
     environment: {
       nodeEnv: process.env.NODE_ENV || 'development',
       port: process.env.PORT || 3000,
+      baseUrlSource: process.env.BASE_URL ? 'env' : 'auto-detected',
     },
   });
 });
