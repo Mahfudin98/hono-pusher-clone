@@ -70,6 +70,39 @@ Buka beberapa tab browser dengan URL yang sama untuk melihat real-time broadcast
 
 ## API Endpoints
 
+### GET /info
+Menampilkan informasi base URL, semua endpoint yang tersedia, dan status sistem.
+
+**Response:**
+```json
+{
+  "name": "Hono Pusher Clone",
+  "version": "1.0.0",
+  "baseUrl": "http://localhost:3000",
+  "endpoints": {
+    "info": "http://localhost:3000/info",
+    "websocket": "ws://localhost:3000/ws",
+    "trigger": "http://localhost:3000/trigger",
+    "demo": "http://localhost:3000/"
+  },
+  "status": {
+    "mongodb": "connected",
+    "websocket": "ready",
+    "clients": 0
+  },
+  "environment": {
+    "nodeEnv": "production",
+    "port": "3000"
+  }
+}
+```
+
+**Kegunaan:**
+- Cek base URL aplikasi di production
+- Verifikasi status koneksi MongoDB
+- Lihat jumlah klien WebSocket yang terhubung
+- Debug environment configuration
+
 ### POST /trigger
 Broadcast event ke semua klien yang terhubung.
 
@@ -110,14 +143,25 @@ WebSocket endpoint untuk koneksi real-time.
 
 4. **Environment Variables**:
    - `MONGO_URI`: Connection string MongoDB Anda
-   - `PORT`: 3000
+     - Jika tidak diset, app akan tetap jalan tapi tanpa database
+     - Format: `mongodb://username:password@host:port/database`
+     - Contoh MongoDB Atlas: `mongodb+srv://user:pass@cluster.mongodb.net/dbname`
+   - `PORT`: 3000 (opsional, default 3000)
+   - `ALLOWED_ORIGINS`: `*` atau domain Anda (contoh: `https://yourdomain.com`)
 
 5. **Deploy**: Klik deploy dan tunggu hingga selesai
 
+6. **Cek Base URL**: Setelah deploy, akses endpoint `/info` untuk melihat base URL dan status:
+   ```bash
+   curl https://your-app.coolify.io/info
+   ```
+
 ### Catatan Deployment:
-- Coolify menggunakan Traefik yang mendukung WebSocket secara default
-- Pastikan domain Anda sudah dikonfigurasi dengan benar
-- Untuk database, Anda bisa menggunakan MongoDB service di Coolify atau external database
+- ✅ Aplikasi akan tetap berjalan meskipun MongoDB tidak tersedia
+- ✅ Coolify menggunakan Traefik yang mendukung WebSocket secara default
+- ✅ Gunakan endpoint `/info` untuk debug dan verifikasi deployment
+- ⚠️ Pastikan `MONGO_URI` diset dengan benar jika ingin menggunakan database
+- 💡 Untuk database, Anda bisa menggunakan MongoDB service di Coolify atau external database (MongoDB Atlas)
 
 ## Struktur Project
 

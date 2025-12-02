@@ -3,7 +3,7 @@ import { serveStatic } from '@hono/node-server/serve-static';
 import { createNodeWebSocket } from '@hono/node-ws';
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
-import { connectDB } from './db.js';
+import { connectDB, isConnected } from './db.js';
 import type { WSContext } from 'hono/ws';
 
 const app = new Hono();
@@ -34,6 +34,34 @@ const { injectWebSocket, upgradeWebSocket } = createNodeWebSocket({ app });
 // Store connected clients
 // In a real app, you might want to use Redis or similar for scaling
 const clients = new Set<WSContext>();
+
+// Info endpoint - shows base URL and connection status
+app.get('/info', (c) => {
+  const protocol = c.req.header('x-forwarded-proto') || 'http';
+  const host = c.req.header('host') || 'localhost:3000';
+  const baseUrl = `${protocol}://${host}`;
+  
+  return c.json({
+    name: 'Hono Pusher Clone',
+    version: '1.0.0',
+    baseUrl,
+    endpoints: {
+      info: `${baseUrl}/info`,
+      websocket: `${baseUrl.replace('http', 'ws')}/ws`,
+      trigger: `${baseUrl}/trigger`,
+      demo: `${baseUrl}/`,
+    },
+    status: {
+      mongodb: isConnected() ? 'connected' : 'disconnected',
+      websocket: 'ready',
+      clients: clients.size,
+    },
+    environment: {
+      nodeEnv: process.env.NODE_ENV || 'development',
+      port: process.env.PORT || 3000,
+    },
+  });
+});
 
 app.get(
   '/ws',
@@ -74,14 +102,22 @@ app.post('/trigger', async (c) => {
 app.get('/', serveStatic({ path: './public/index.html' }));
 app.get('/public/*', serveStatic({ root: './' }));
 
-connectDB().then(() => {
-  const port = Number(process.env.PORT) || 3000;
-  console.log(`Server is running on port ${port}`);
-  
-  const server = serve({
-    fetch: app.fetch,
-    port,
-  });
-  
-  injectWebSocket(server);
+// Start server (don't wait for DB connection)
+const port = Number(process.env.PORT) || 3000;
+
+const server = serve({
+  fetch: app.fetch,
+  port,
+});
+
+injectWebSocket(server);
+
+console.log(`🚀 Server is running on port ${port}`);
+console.log(`📍 Visit /info endpoint to see base URL and status`);
+
+// Connect to DB in background
+connectDB().then((connected) => {
+  if (connected) {
+    console.log('✅ Database ready');
+  }
 });
