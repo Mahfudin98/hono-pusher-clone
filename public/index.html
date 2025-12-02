@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hono Pusher Clone</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; }
+        #messages { border: 1px solid #ccc; padding: 10px; height: 300px; overflow-y: scroll; margin-bottom: 10px; }
+        .message { margin-bottom: 5px; padding: 5px; background-color: #f0f0f0; border-radius: 4px; }
+        .controls { display: flex; gap: 10px; margin-bottom: 10px; }
+        input, button { padding: 8px; }
+    </style>
+</head>
+<body>
+    <h1>Hono Pusher Clone</h1>
+    
+    <div class="controls">
+        <input type="text" id="channelInput" placeholder="Channel" value="my-channel">
+        <input type="text" id="eventInput" placeholder="Event" value="my-event">
+        <input type="text" id="dataInput" placeholder="Data" value="Hello World">
+        <button onclick="triggerEvent()">Trigger Event</button>
+    </div>
+
+    <div id="messages"></div>
+
+    <script>
+        const messagesDiv = document.getElementById('messages');
+        const ws = new WebSocket('ws://localhost:3000/ws');
+
+        ws.onopen = () => {
+            addMessage('System', 'Connected to WebSocket');
+        };
+
+        ws.onmessage = (event) => {
+            try {
+                const data = JSON.parse(event.data);
+                addMessage('Received', JSON.stringify(data, null, 2));
+            } catch (e) {
+                addMessage('Received', event.data);
+            }
+        };
+
+        ws.onclose = () => {
+            addMessage('System', 'Disconnected from WebSocket');
+        };
+
+        function addMessage(source, text) {
+            const div = document.createElement('div');
+            div.className = 'message';
+            div.innerHTML = `<strong>${source}:</strong> <pre>${text}</pre>`;
+            messagesDiv.appendChild(div);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+
+        async function triggerEvent() {
+            const channel = document.getElementById('channelInput').value;
+            const event = document.getElementById('eventInput').value;
+            const data = document.getElementById('dataInput').value;
+
+            try {
+                const response = await fetch('/trigger', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ channel, event, data })
+                });
+                const result = await response.json();
+                console.log(result);
+            } catch (error) {
+                console.error('Error triggering event:', error);
+                addMessage('Error', 'Failed to trigger event');
+            }
+        }
+    </script>
+</body>
+</html>

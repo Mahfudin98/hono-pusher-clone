@@ -1,0 +1,87 @@
+import { serve } from '@hono/node-server';
+import { serveStatic } from '@hono/node-server/serve-static';
+import { createNodeWebSocket } from '@hono/node-ws';
+import { Hono } from 'hono';
+import { cors } from 'hono/cors';
+import { connectDB } from './db.js';
+import type { WSContext } from 'hono/ws';
+
+const app = new Hono();
+
+// CORS whitelist configuration
+const allowedOrigins = process.env.ALLOWED_ORIGINS 
+  ? process.env.ALLOWED_ORIGINS.split(',').map(origin => origin.trim())
+  : ['http://localhost:3000', 'http://127.0.0.1:3000'];
+
+app.use('/*', cors({
+  origin: (origin) => {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return '*';
+    
+    // Check if origin is in whitelist
+    if (allowedOrigins.includes(origin) || allowedOrigins.includes('*')) {
+      return origin;
+    }
+    
+    // Reject origin
+    return null;
+  },
+  credentials: true,
+}));
+
+const { injectWebSocket, upgradeWebSocket } = createNodeWebSocket({ app });
+
+// Store connected clients
+// In a real app, you might want to use Redis or similar for scaling
+const clients = new Set<WSContext>();
+
+app.get(
+  '/ws',
+  upgradeWebSocket((c) => {
+    return {
+      onOpen(event, ws) {
+        console.log('Client connected');
+        clients.add(ws);
+      },
+      onMessage(event, ws) {
+        console.log(`Message from client: ${event.data}`);
+        ws.send('Hello from server!');
+      },
+      onClose(event, ws) {
+        console.log('Client disconnected');
+        clients.delete(ws);
+      },
+    };
+  })
+);
+
+app.post('/trigger', async (c) => {
+  const body = await c.req.json();
+  const { channel, event, data } = body;
+
+  console.log(`Triggering event: ${event} on channel: ${channel}`);
+
+  const message = JSON.stringify({ channel, event, data });
+
+  // Broadcast to all connected clients
+  clients.forEach((ws) => {
+    ws.send(message);
+  });
+
+  return c.json({ success: true, message: 'Event triggered' });
+});
+
+app.get('/', serveStatic({ path: './public/index.html' }));
+app.get('/public/*', serveStatic({ root: './' }));
+
+connectDB().then(() => {
+  const port = Number(process.env.PORT) || 3000;
+  console.log(`Server is running on port ${port}`);
+  
+  const server = serve({
+    fetch: app.fetch,
+    port,
+  });
+  
+  injectWebSocket(server);
+});
